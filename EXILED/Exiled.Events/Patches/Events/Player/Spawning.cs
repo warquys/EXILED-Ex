@@ -63,9 +63,9 @@ namespace Exiled.Events.Patches.Events.Player
                 // Create a new instance of `SpawningEventArgs`.
                 new CodeInstruction(OpCodes.Newobj, GetDeclaredConstructors(typeof(SpawningEventArgs))[0]),
 
-                // Duplicate the object to store it and pass it around.
-                new CodeInstruction(OpCodes.Dup), // Duplicate the `SpawningEventArgs` object.
-                new CodeInstruction(OpCodes.Stloc, ev.LocalIndex), // Store the duplicated object in a local variable.
+                // Duplicate the reference to store it and pass it around.
+                new CodeInstruction(OpCodes.Dup), // Duplicate the reference of `SpawningEventArgs`.
+                new CodeInstruction(OpCodes.Stloc, ev.LocalIndex), // Store the reference in a local variable.
 
                 // Call `Handlers.Player.OnSpawning`.
                 new CodeInstruction(OpCodes.Call, Method(typeof(Handlers.Player), nameof(Handlers.Player.OnSpawning))),

@@ -63,7 +63,11 @@ namespace Exiled.API.Features.Roles
         /// <summary>
         /// Gets the base <see cref="PlayerRoleBase"/>.
         /// </summary>
-        public PlayerRoleBase Base { get; }
+#pragma warning disable SA1623 // Property summary documentation should match accessors, do not care of the sets it's protected
+
+        // Set it virtual ? breaking change ?
+        public PlayerRoleBase Base { get; protected set; }
+#pragma warning restore SA1623 // Property summary documentation should match accessors
 
         /// <summary>
         /// Gets the <see cref="RoleChangeReason"/>.

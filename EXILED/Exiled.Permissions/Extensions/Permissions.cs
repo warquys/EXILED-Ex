@@ -12,6 +12,7 @@ namespace Exiled.Permissions.Extensions
     using System.IO;
     using System.Linq;
     using System.Text;
+    using System.Text.RegularExpressions;
 
     using CommandSystem;
 
@@ -29,6 +30,8 @@ namespace Exiled.Permissions.Extensions
     using YamlDotNet.Serialization.NamingConventions;
 
     using static Exiled.Permissions.Permissions;
+
+    using Group = Features.Group;
 
     /// <inheritdoc cref="Exiled.Permissions.Permissions"/>
     public static class Permissions
@@ -134,18 +137,45 @@ namespace Exiled.Permissions.Extensions
             {
                 try
                 {
+                    // old system
                     IEnumerable<string> inheritedPerms = new List<string>();
-
                     inheritedPerms = Groups.Where(pair => group.Value.Inheritance.Contains(pair.Key))
                         .Aggregate(inheritedPerms, (current, pair) => current.Union(pair.Value.CombinedPermissions));
 
                     group.Value.CombinedPermissions = group.Value.Permissions.Union(inheritedPerms).ToList();
 
+                    // new system
+                    PermissionNode.BuildTree(group.Value.Permissions, out List<PermissionNode> tree, out bool allMighty);
+                    group.Value.AllMighty = allMighty;
+                    group.Value.PermisionTree = tree;
                     Log.Debug($"{group.Key} permissions loaded.");
                 }
                 catch (Exception e)
                 {
                     Log.Error($"Failed to load permissions/inheritance for: {group.Key}.\n{e.Message}.\nMake sure your config file is setup correctly, every group defined must include inheritance and permissions values, even if they are empty.");
+                    Log.Debug($"{e}");
+                }
+            }
+
+            // new system merge, can be better but the old is at the same level and i do not have some mutch time
+            foreach (KeyValuePair<string, Group> group in Groups.Reverse())
+            {
+                try
+                {
+                    foreach (string inheritedGroupKey in group.Value.Inheritance)
+                    {
+                        if (Groups.TryGetValue(inheritedGroupKey, out Group inheritedGroup))
+                        {
+                            PermissionNode.MergeTrees(group.Value.PermisionTree, inheritedGroup.PermisionTree);
+                            group.Value.AllMighty |= inheritedGroup.AllMighty;
+                        }
+                    }
+
+                    Log.Debug($"{group.Key} permission tree merged.");
+                }
+                catch (Exception e)
+                {
+                    Log.Error($"Failed to merge permission tree for: {group.Key}.\n{e.Message}.\nMake sure your config file is setup correctly, every group defined must include inheritance and permissions values, even if they are empty.");
                     Log.Debug($"{e}");
                 }
             }
@@ -223,61 +253,48 @@ namespace Exiled.Permissions.Extensions
             }
 
             const char permSeparator = '.';
-            const string allPerms = ".*";
 
-            if (group.CombinedPermissions.Contains(allPerms))
+            if (group.AllMighty)
                 return true;
 
+            bool result;
             if (permission.Contains(permSeparator))
             {
-                StringBuilder strBuilder = StringBuilderPool.Pool.Get();
-                string[] seraratedPermissions = permission.Split(permSeparator);
+                string[] rowNodes = permission.Split(permSeparator);
+                result = false;
 
-                bool Check(string source) => group.CombinedPermissions.Contains(source, StringComparison.OrdinalIgnoreCase);
-
-                bool result = false;
-                for (int z = 0; z < seraratedPermissions.Length; z++)
+                PermissionNode node = null;
+                foreach (string rowNode in rowNodes)
                 {
-                    if (z != 0)
+                    if (node is null)
                     {
-                        // We need to clear the last ALL_PERMS line
-                        // or it'll be like 'permission.*.subpermission'.
-                        strBuilder.Length -= allPerms.Length;
-
-                        // Separate permission groups by using its separator.
-                        strBuilder.Append(permSeparator);
+                        node = group.PermisionTree.Find(n => string.Equals(n.Name, rowNode, StringComparison.OrdinalIgnoreCase));
+                        if (node is null)
+                            break; // result is already false
                     }
-
-                    strBuilder.Append(seraratedPermissions[z]);
-
-                    // If it's the last index,
-                    // then we don't need to check for all permissions of the subpermission.
-                    if (z == seraratedPermissions.Length - 1)
+                    else
                     {
-                        result = Check(strBuilder.ToString());
-                        break;
-                    }
+                        if (node.AllPermsions)
+                        {
+                            result = true;
+                            break;
+                        }
 
-                    strBuilder.Append(allPerms);
-                    if (Check(strBuilder.ToString()))
-                    {
-                        result = true;
-                        break;
+                        if (!node.TryGetSubNode(rowNode, out node))
+                            break; // result is already false
                     }
                 }
-
-                StringBuilderPool.Pool.Return(strBuilder);
 
                 Log.Debug($"Result in the block: {result}");
                 return result;
             }
 
             // It'll work when there is no dot in the permission.
-            bool result2 = group.CombinedPermissions.Contains(permission, StringComparison.OrdinalIgnoreCase);
+            result = group.PermisionTree.Exists(n => string.Equals(n.Name, permission, StringComparison.OrdinalIgnoreCase));
 
-            Log.Debug($"Result outside the block: {result2}");
+            Log.Debug($"Result outside the block: {result}");
 
-            return result2;
+            return result;
         }
 
         /// <summary>

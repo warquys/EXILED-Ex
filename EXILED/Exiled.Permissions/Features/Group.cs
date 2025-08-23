@@ -7,6 +7,7 @@
 
 namespace Exiled.Permissions.Features
 {
+    using System;
     using System.Collections.Generic;
 
     using YamlDotNet.Serialization;
@@ -36,6 +37,19 @@ namespace Exiled.Permissions.Features
         /// Gets the combined permissions of the group plus all inherited groups.
         /// </summary>
         [YamlIgnore]
+        [Obsolete("Nu'hu do not use this any more, look for the coolest PermisionTree. The value is still reable but writing in it do not do nothing.")]
         public List<string> CombinedPermissions { get; internal set; } = new();
+
+        /// <summary>
+        /// Gets or sets a value indicating whether the groops as <b>full permission</b>, be careful when setting it.
+        /// </summary>
+        [YamlIgnore]
+        public bool AllMighty { get; set; } = false;
+
+        /// <summary>
+        /// Gets the permission tree of the group.
+        /// </summary>
+        [YamlIgnore]
+        public List<PermissionNode> PermisionTree { get; internal set; } = new();
     }
 }
